@@ -125,6 +125,10 @@ const (
 	CLIOptQuiet = "quiet"
 	// CLIOptForce is the cli option for force mode
 	CLIOptForce = "force"
+	// CLIOptFile is the cli option for file
+	CLIOptFile = "file"
+	// CLIOptQuery is the cli option for query
+	CLIOptQuery = "query"
 
 	// CLIFlagEndpoint is the cli flag for endpoint
 	CLIFlagEndpoint = CLIOptEndpoint + ", ep"
@@ -172,7 +176,10 @@ const (
 	CLIFlagForce = CLIOptForce + ", f"
 	// CLIFlagDisableInitialHostLookup is the cli flag for only using supplied hosts to connect to the database
 	CLIFlagDisableInitialHostLookup = "disable-initial-host-lookup"
-
+	// CLIFlagQuery is the cli flag for the CQL query to be executed.
+	CLIFlagQuery = CLIOptQuery + ", q"
+	// CLIFlagQueryFile is the cli flag for the file that contains CQL to be executed.
+	CLIFlagQueryFile = CLIOptFile + ", f"
 	// CLIFlagEnableTLS enables cassandra client TLS
 	CLIFlagEnableTLS = "tls"
 	// CLIFlagTLSCertFile is the optional tls cert file (tls must be enabled)

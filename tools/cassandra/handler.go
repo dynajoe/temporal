@@ -25,8 +25,12 @@
 package cassandra
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/urfave/cli"
 
@@ -148,6 +152,60 @@ func validateHealth(cli *cli.Context, logger log.Logger) error {
 	return nil
 }
 
+func executeQuery(cli *cli.Context, logger log.Logger) error {
+	config, err := newCQLClientConfig(cli)
+	if err != nil {
+		logger.Error("Unable to read config.", tag.Error(schema.NewConfigError(err.Error())))
+		return err
+	}
+
+	filePath := cli.String(schema.CLIOptFile)
+	rawQuery := cli.String(schema.CLIOptQuery)
+
+	// At least one query argument is required
+	if strings.TrimSpace(rawQuery) == "" && strings.TrimSpace(filePath) == "" {
+		err := fmt.Errorf("missing query argument, specify one of %s or %s", flag(schema.CLIOptFile), flag(schema.CLIOptQuery))
+		logger.Error("Invalid argument.", tag.Error(err))
+		return err
+	}
+
+	// Multiple query arguments is invalid
+	if rawQuery != "" && filePath != "" {
+		err := fmt.Errorf("ambiguous query arguments, specify one of %s or %s", flag(schema.CLIOptFile), flag(schema.CLIOptQuery))
+		logger.Error("Invalid argument.", tag.Error(err))
+		return err
+	}
+
+	if filePath != "" {
+		rawQuery, err = readStringFromFile(filePath)
+		if err != nil {
+			logger.Error("Unable to load CQL query.", tag.Error(err))
+			return nil
+		}
+	}
+
+	// Ensure there's a query to execute
+	if strings.TrimSpace(rawQuery) == "" {
+		logger.Warn("nothing to execute")
+		return nil
+	}
+
+	client, err := newCQLClient(config, logger)
+	if err != nil {
+		logger.Error("Unable to establish CQL session.", tag.Error(err))
+		return err
+	}
+	defer client.Close()
+
+	query := client.session.Query(rawQuery)
+	if err := query.Exec(); err != nil {
+		logger.Error("Error executing CQL.", tag.Error(err))
+		return err
+	}
+
+	return nil
+}
+
 func doCreateKeyspace(cfg *CQLClientConfig, name string, logger log.Logger) error {
 	cfg.Keyspace = systemKeyspace
 	client, err := newCQLClient(cfg, logger)
@@ -252,6 +310,41 @@ func validateCQLClientConfig(config *CQLClientConfig) error {
 	}
 
 	return nil
+}
+
+func readStringFromFile(name string) (string, error) {
+	readBytesFunc := func() ([]byte, error) {
+		rawBytes, err := os.ReadFile(os.ExpandEnv(name))
+		if err != nil {
+			return nil, fmt.Errorf("error reading from file: %w", err)
+		}
+		return rawBytes, nil
+	}
+
+	if name == "-" {
+		// Read query from stdin
+		readBytesFunc = func() ([]byte, error) {
+			rawBytes, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return nil, fmt.Errorf("error reading from stdin: %w", err)
+			}
+			return rawBytes, nil
+		}
+	}
+
+	rawBytes, err := readBytesFunc()
+	if err != nil {
+		return "", err
+	}
+
+	if !utf8.Valid(rawBytes) {
+		return "", errors.New("invalid UTF-8 encoding")
+	}
+
+	if rawBytes == nil {
+		return "", nil
+	}
+	return string(rawBytes), nil
 }
 
 func flag(opt string) string {

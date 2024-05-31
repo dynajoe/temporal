@@ -285,6 +285,25 @@ func buildCLIOptions() *cli.App {
 				cliHandler(c, validateHealth, logger)
 			},
 		},
+		{
+			Name:    "execute",
+			Aliases: []string{"exec"},
+			Usage:   "executes a CQL query",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:      schema.CLIFlagQueryFile,
+					TakesFile: true,
+					Usage:     "File with CQL query to execute ('-' for stdin)",
+				},
+				cli.StringFlag{
+					Name:  schema.CLIFlagQuery,
+					Usage: "CQL query to execute",
+				},
+			},
+			Action: func(c *cli.Context) {
+				cliHandler(c, executeQuery, logger)
+			},
+		},
 	}
 
 	return app
